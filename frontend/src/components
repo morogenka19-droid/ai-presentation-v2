@@ -1,0 +1,63 @@
+import React, { useState } from 'react';
+
+function Editor({ slides, onSave, onClose }) {
+  const [editedSlides, setEditedSlides] = useState(slides);
+
+  const updateSlide = (index, field, value) => {
+    const newSlides = [...editedSlides];
+    newSlides[index][field] = value;
+    setEditedSlides(newSlides);
+  };
+
+  const updatePoint = (slideIndex, pointIndex, value) => {
+    const newSlides = [...editedSlides];
+    newSlides[slideIndex].points[pointIndex] = value;
+    setEditedSlides(newSlides);
+  };
+
+  return (
+    <div className="editor-overlay">
+      <div className="editor-modal">
+        <h2>✏️ Редактор презентации</h2>
+        <p>Отредактируй текст перед скачиванием</p>
+        
+        <div className="editor-slides">
+          {editedSlides.map((slide, idx) => (
+            <div key={idx} className="editor-slide">
+              <input
+                type="text"
+                value={slide.title}
+                onChange={(e) => updateSlide(idx, 'title', e.target.value)}
+                className="editor-title"
+                placeholder="Заголовок слайда"
+              />
+              <div className="editor-points">
+                {slide.points.map((point, pIdx) => (
+                  <input
+                    key={pIdx}
+                    type="text"
+                    value={point}
+                    onChange={(e) => updatePoint(idx, pIdx, e.target.value)}
+                    className="editor-point"
+                    placeholder={`Пункт ${pIdx + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="editor-actions">
+          <button onClick={() => onSave(editedSlides)} className="btn-save">
+            ✅ Сохранить и скачать
+          </button>
+          <button onClick={onClose} className="btn-cancel">
+            ❌ Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Editor;
