@@ -15,10 +15,9 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,9 +25,8 @@ app.add_middleware(
 
 class TopicRequest(BaseModel):
     topic: str
-    template: str = "modern"  # modern, business, creative
+    template: str = "modern"
 
-# DeepSeek клиент
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
@@ -36,7 +34,6 @@ client = OpenAI(
 )
 
 def get_image_url(query):
-    """Получает URL картинки через Unsplash"""
     try:
         url = f"https://source.unsplash.com/featured/?{query.replace(' ', ',')}"
         return url
@@ -46,11 +43,9 @@ def get_image_url(query):
 "/generate"
 async def generate_presentation(request: TopicRequest):
     try:
-        # 1. Генерация структуры через DeepSeek
         prompt = f"""
         Составь структуру презентации на тему "{request.topic}".
         Создай 7 слайдов. Каждый слайд должен содержать заголовок и 3-4 пункта.
-        Также предложи ключевые слова для поиска картинок к каждому слайду.
         Верни ответ строго в формате JSON:
         [
             {{"title": "Заголовок 1", "points": ["пункт 1", "пункт 2", "пункт 3"], "image": "ключевые слова"}},
@@ -59,7 +54,7 @@ async def generate_presentation(request: TopicRequest):
         """
         
         response = client.chat.completions.create(
-            model="deepseek-v4-flash",
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": "Ты помогаешь создавать структуру презентаций."},
                 {"role": "user", "content": prompt}
@@ -69,28 +64,17 @@ async def generate_presentation(request: TopicRequest):
         
         slides_data = json.loads(response.choices[0].message.content)
         
-        # 2. Создание PPTX
         prs = Presentation()
         
-        # Выбор шаблона
-        if request.template == "business":
-            prs = Presentation()  # Базовый
-        elif request.template == "creative":
-            prs = Presentation()  # Базовый
-            
-        # Титульный слайд
         title_slide_layout = prs.slide_layouts[0]
         slide = prs.slides.add_slide(title_slide_layout)
         slide.shapes.title.text = request.topic
-        slide.placeholders[1].text = f"Создано с помощью AI • {request.template} шаблон"
+        slide.placeholders[1].text = f"Создано с помощью AI • {request.template}"
         
-        # Остальные слайды с картинками
-        for i, slide_info in enumerate(slides_data):
-            # Слайд с заголовком и текстом
+        for slide_info in slides_data:
             bullet_slide_layout = prs.slide_layouts[1]
             slide = prs.slides.add_slide(bullet_slide_layout)
             slide.shapes.title.text = slide_info["title"]
-            
             content = slide.placeholders[1]
             text_frame = content.text_frame
             text_frame.text = ""
@@ -99,7 +83,6 @@ async def generate_presentation(request: TopicRequest):
                 p.text = point
                 p.level = 0
             
-            # Добавляем картинку (если есть)
             if "image" in slide_info and slide_info["image"]:
                 try:
                     img_url = get_image_url(slide_info["image"])
@@ -108,16 +91,13 @@ async def generate_presentation(request: TopicRequest):
                         if img_response.status_code == 200:
                             with open("temp_img.jpg", "wb") as f:
                                 f.write(img_response.content)
-                            
-                            # Вставляем картинку в правый верхний угол
                             left = Inches(8)
                             top = Inches(1.5)
-slide.shapes.add_picture("temp_img.jpg", left, top, width=Inches(3), height=Inches(3))
+                            slide.shapes.add_picture("temp_img.jpg", left, top, width=Inches(3), height=Inches(3))
                             os.remove("temp_img.jpg")
                 except:
-                    pass  # Пропускаем, если картинку не удалось загрузить
+                    pass
         
-        # Сохраняем файл
         filename = f"presentation_{uuid.uuid4()}.pptx"
         prs.save(filename)
         
@@ -132,8 +112,8 @@ slide.shapes.add_picture("temp_img.jpg", left, top, width=Inches(3), height=Inch
 
 @app.get("/")
 def root():
-    return {"message": "AI Presentation Generator API с картинками!"}
+    return {"message": "AI Presentation Generator API работает!"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=10000)
